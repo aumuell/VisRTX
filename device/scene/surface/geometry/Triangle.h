@@ -53,9 +53,14 @@ struct Triangle : public Geometry
   GeometryGPUData gpuData() const override;
   void cleanup();
 
+  bool m_valid{false};
+
+  ANARIDataType m_vertexPositionType{ANARI_UNKNOWN};
+  ANARIDataType m_primitiveIndexType{ANARI_UNKNOWN};
+
   helium::IntrusivePtr<Array1D> m_index;
 
-  helium::IntrusivePtr<Array1D> m_vertex;
+  helium::IntrusivePtr<Array1D> m_vertexPosition;
   helium::IntrusivePtr<Array1D> m_vertexColor;
   helium::IntrusivePtr<Array1D> m_vertexNormal;
   helium::IntrusivePtr<Array1D> m_vertexAttribute0;

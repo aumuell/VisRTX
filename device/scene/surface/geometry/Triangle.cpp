@@ -48,7 +48,7 @@ void Triangle::commit()
 
   m_index = getParamObject<Array1D>("primitive.index");
 
-  m_vertex = getParamObject<Array1D>("vertex.position");
+  m_vertexPosition = getParamObject<Array1D>("vertex.position");
   m_vertexColor = getParamObject<Array1D>("vertex.color");
   m_vertexNormal = getParamObject<Array1D>("vertex.normal");
   m_vertexAttribute0 = getParamObject<Array1D>("vertex.attribute0");
@@ -63,37 +63,60 @@ void Triangle::commit()
   m_vertexAttribute3Index = getParamObject<Array1D>("vertex.attribute3.index");
   m_vertexColorIndex = getParamObject<Array1D>("vertex.color.index");
 
-  if (!m_vertex) {
+  if (!m_vertexPosition) {
     reportMessage(ANARI_SEVERITY_WARNING,
         "missing required parameter 'vertex.position' on triangle geometry");
     return;
   }
 
-  if (!m_index && m_vertex->size() % 3 != 0) {
+  m_vertexPositionType = m_vertexPosition->elementType();
+
+  if (!(m_vertexPositionType == ANARI_FLOAT32_VEC3
+          || m_vertexPositionType == ANARI_FLOAT32_VEC4)) {
+    reportMessage(ANARI_SEVERITY_WARNING,
+        "invalid triangle 'vertex.position' array element type %s",
+        anari::toString(m_vertexPositionType));
+    return;
+  }
+
+  if (!m_index && m_vertexPosition->size() % 3 != 0) {
     reportMessage(ANARI_SEVERITY_ERROR,
         "'vertex.position' on triangle geometry is a non-multiple of 3"
         " without 'primitive.index' present");
     return;
   }
 
+  if (m_index) {
+    m_primitiveIndexType = m_index->elementType();
+    if (!(m_primitiveIndexType == ANARI_UINT32_VEC3
+            || m_primitiveIndexType == ANARI_UINT16_VEC3)) {
+      reportMessage(ANARI_SEVERITY_WARNING,
+          "invalid triangle 'primitive.index' array element type %s",
+          anari::toString(m_primitiveIndexType));
+      return;
+    }
+  }
+
   if (m_vertexNormal && !m_vertexNormalIndex
-      && m_vertex->size() != m_vertexNormal->size()) {
+      && m_vertexPosition->size() != m_vertexNormal->size()) {
     reportMessage(ANARI_SEVERITY_WARNING,
         "'vertex.normal' on triangle geometry not the same size as "
         "'vertex.position' (%zu) vs. (%zu)",
         m_vertexNormal->size(),
-        m_vertex->size());
+        m_vertexPosition->size());
   }
 
   reportMessage(ANARI_SEVERITY_DEBUG,
       "committing %s triangle geometry",
       m_index ? "indexed" : "soup");
 
+  m_valid = true;
+
   if (m_index)
     m_index->addCommitObserver(this);
-  m_vertex->addCommitObserver(this);
+  m_vertexPosition->addCommitObserver(this);
 
-  m_vertexBufferPtr = (CUdeviceptr)m_vertex->beginAs<vec3>(AddressSpace::GPU);
+  m_vertexBufferPtr = (CUdeviceptr)m_vertexPosition->begin(AddressSpace::GPU);
 
   upload();
 }
@@ -103,16 +126,21 @@ void Triangle::populateBuildInput(OptixBuildInput &buildInput) const
   buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
   buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-  buildInput.triangleArray.vertexStrideInBytes = sizeof(vec3);
-  buildInput.triangleArray.numVertices = m_vertex->size();
+  buildInput.triangleArray.vertexStrideInBytes =
+      anari::sizeOf(m_vertexPositionType);
+  buildInput.triangleArray.numVertices = m_vertexPosition->size();
   buildInput.triangleArray.vertexBuffers = &m_vertexBufferPtr;
 
   if (m_index) {
-    buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    buildInput.triangleArray.indexStrideInBytes = sizeof(uvec3);
+    buildInput.triangleArray.indexFormat =
+        m_primitiveIndexType == ANARI_UINT32_VEC3
+        ? OPTIX_INDICES_FORMAT_UNSIGNED_INT3
+        : OPTIX_INDICES_FORMAT_UNSIGNED_SHORT3;
+    buildInput.triangleArray.indexStrideInBytes =
+        anari::sizeOf(m_primitiveIndexType);
     buildInput.triangleArray.numIndexTriplets = m_index->size();
     buildInput.triangleArray.indexBuffer =
-        (CUdeviceptr)m_index->beginAs<uvec3>(AddressSpace::GPU);
+        (CUdeviceptr)m_index->begin(AddressSpace::GPU);
   } else {
     buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_NONE;
     buildInput.triangleArray.indexStrideInBytes = 0;
@@ -133,7 +161,7 @@ int Triangle::optixGeometryType() const
 
 bool Triangle::isValid() const
 {
-  return m_vertex;
+  return m_valid;
 }
 
 GeometryGPUData Triangle::gpuData() const
@@ -143,8 +171,8 @@ GeometryGPUData Triangle::gpuData() const
 
   auto &tri = retval.tri;
 
-  tri.vertices = m_vertex->beginAs<vec3>(AddressSpace::GPU);
-  tri.indices = m_index ? m_index->beginAs<uvec3>(AddressSpace::GPU) : nullptr;
+  tri.vertices = m_vertexPosition->begin(AddressSpace::GPU);
+  tri.indices = m_index ? m_index->begin(AddressSpace::GPU) : nullptr;
 
   tri.vertexNormals = m_vertexNormal
       ? m_vertexNormal->beginAs<vec3>(AddressSpace::GPU)
@@ -185,8 +213,9 @@ void Triangle::cleanup()
 {
   if (m_index)
     m_index->removeCommitObserver(this);
-  if (m_vertex)
-    m_vertex->removeCommitObserver(this);
+  if (m_vertexPosition)
+    m_vertexPosition->removeCommitObserver(this);
+  m_valid = false;
 }
 
 } // namespace visrtx
