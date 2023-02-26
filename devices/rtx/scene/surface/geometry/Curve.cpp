@@ -106,9 +106,9 @@ void Curve::populateBuildInput(OptixBuildInput &buildInput) const
   curveArray.normalStrideInBytes = 0;
 }
 
-int Curve::optixGeometryType() const
+GeometryType Curve::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_CURVES;
+  return GeometryType::CURVE;
 }
 
 bool Curve::isValid() const

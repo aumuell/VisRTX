@@ -161,9 +161,9 @@ GeometryGPUData Sphere::gpuData() const
   return retval;
 }
 
-int Sphere::optixGeometryType() const
+GeometryType Sphere::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+  return GeometryType::SPHERE;
 }
 
 bool Sphere::isValid() const

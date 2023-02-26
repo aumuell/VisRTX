@@ -45,9 +45,9 @@ GeometryGPUData UnknownGeometry::gpuData() const
   return {};
 }
 
-int UnknownGeometry::optixGeometryType() const
+GeometryType UnknownGeometry::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+  return GeometryType::UNKNOWN;
 }
 
 bool UnknownGeometry::isValid() const

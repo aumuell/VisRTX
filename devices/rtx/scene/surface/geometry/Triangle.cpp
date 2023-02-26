@@ -126,9 +126,9 @@ void Triangle::populateBuildInput(OptixBuildInput &buildInput) const
   buildInput.triangleArray.numSbtRecords = 1;
 }
 
-int Triangle::optixGeometryType() const
+GeometryType Triangle::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+  return GeometryType::TRIANGLE;
 }
 
 bool Triangle::isValid() const

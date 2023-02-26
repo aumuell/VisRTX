@@ -148,10 +148,7 @@ RT_FUNCTION uvec4 decodeQuadAttributeIndices(
 RT_FUNCTION uvec2 decodeCylinderAttributeIndices(
     const GeometryGPUData &ggd, uint32_t attributeID, const SurfaceHit &hit)
 {
-  if (ggd.cylinder.indices != nullptr)
-    return ggd.cylinder.indices[hit.primID];
-  else
-    return 2 * hit.primID + uvec2(0, 1);
+  return ggd.cylinder.attrIndices[hit.primID];
 }
 
 RT_FUNCTION uint32_t decodeCurveAttributeIndices(
@@ -193,7 +190,8 @@ RT_FUNCTION vec4 readAttributeValue(uint32_t attributeID, const SurfaceHit &hit)
   } else if (ggd.type == GeometryType::CYLINDER) {
     const auto &ap = ggd.cylinder.vertexAttr[attributeID];
     if (isPopulated(ap)) {
-      const uvec2 idx = decodeCylinderAttributeIndices(ggd, attributeID, hit);
+      const uvec2 idx =
+          decodeCylinderAttributeIndices(ggd, attributeID, hit);
       const vec3 b = hit.uvw;
       return b.y * getAttributeValue(ap, idx.x)
           + b.z * getAttributeValue(ap, idx.y);

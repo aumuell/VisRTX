@@ -81,7 +81,8 @@ bool Group::getProperty(
       rebuildVolumeBVH();
     }
     auto bounds = m_triangleBounds;
-    bounds.extend(m_curveBounds);
+    bounds.extend(m_curveLinearBounds);
+    bounds.extend(m_curveQuadraticBSplineBounds);
     bounds.extend(m_userBounds);
     bounds.extend(m_volumeBounds);
     std::memcpy(ptr, &bounds, sizeof(bounds));
@@ -120,9 +121,14 @@ OptixTraversableHandle Group::optixTraversableTriangle() const
   return m_traversableTriangle;
 }
 
-OptixTraversableHandle Group::optixTraversableCurve() const
+OptixTraversableHandle Group::optixTraversableCurveLinear() const
 {
-  return m_traversableCurve;
+  return m_traversableCurveLinear;
+}
+
+OptixTraversableHandle Group::optixTraversableCurveQuadraticBSpline() const
+{
+  return m_traversableCurveQuadraticBSpline;
 }
 
 OptixTraversableHandle Group::optixTraversableUser() const
@@ -142,11 +148,19 @@ anari::Span<const DeviceObjectIndex> Group::surfaceTriangleGPUIndices() const
       m_surfacesTriangle.size());
 }
 
-anari::Span<const DeviceObjectIndex> Group::surfaceCurveGPUIndices() const
+anari::Span<const DeviceObjectIndex> Group::surfaceCurveLinearGPUIndices() const
 {
   return anari::make_Span(
-      (const DeviceObjectIndex *)m_surfaceCurveObjectIndices.ptr(),
-      m_surfacesCurve.size());
+      (const DeviceObjectIndex *)m_surfaceCurveLinearObjectIndices.ptr(),
+      m_surfacesCurveLinear.size());
+}
+
+anari::Span<const DeviceObjectIndex>
+Group::surfaceCurveQuadraticBSplineGPUIndices() const
+{
+  return anari::make_Span((const DeviceObjectIndex *)
+                              m_surfaceCurveQuadraticBSplineObjectIndices.ptr(),
+      m_surfacesCurveQuadraticBSpline.size());
 }
 
 anari::Span<const DeviceObjectIndex> Group::surfaceUserGPUIndices() const
@@ -167,9 +181,14 @@ bool Group::containsTriangleGeometry() const
   return !m_surfacesTriangle.empty();
 }
 
-bool Group::containsCurveGeometry() const
+bool Group::containsCurveLinearGeometry() const
 {
-  return !m_surfacesCurve.empty();
+  return !m_surfacesCurveLinear.empty();
+}
+
+bool Group::containsCurveQuadraticBSplineGeometry() const
+{
+  return !m_surfacesCurveQuadraticBSpline.empty();
 }
 
 bool Group::containsUserGeometry() const
@@ -197,10 +216,12 @@ void Group::rebuildSurfaceBVHs()
 {
   if (!m_surfaces) {
     m_triangleBounds = box3();
-    m_curveBounds = box3();
+    m_curveLinearBounds = box3();
+    m_curveQuadraticBSplineBounds = box3();
     m_userBounds = box3();
     m_traversableTriangle = {};
-    m_traversableCurve = {};
+    m_traversableCurveLinear = {};
+    m_traversableCurveQuadraticBSpline = {};
     m_traversableUser = {};
     reportMessage(
         ANARI_SEVERITY_DEBUG, "visrtx::Group skipping surface BVH build");
@@ -214,11 +235,20 @@ void Group::rebuildSurfaceBVHs()
       m_triangleBounds,
       this);
 
-  reportMessage(ANARI_SEVERITY_DEBUG, "visrtx::Group building curve BVH");
-  buildOptixBVH(createOBI(m_surfacesCurve),
-      m_bvhCurve,
-      m_traversableCurve,
-      m_curveBounds,
+  reportMessage(
+      ANARI_SEVERITY_DEBUG, "visrtx::Group building linear curve BVH");
+  buildOptixBVH(createOBI(m_surfacesCurveLinear),
+      m_bvhCurveLinear,
+      m_traversableCurveLinear,
+      m_curveLinearBounds,
+      this);
+
+  reportMessage(ANARI_SEVERITY_DEBUG,
+      "visrtx::Group building quadratic bspline curve BVH");
+  buildOptixBVH(createOBI(m_surfacesCurveQuadraticBSpline),
+      m_bvhCurveQuadraticBSpline,
+      m_traversableCurveQuadraticBSpline,
+      m_curveQuadraticBSplineBounds,
       this);
 
   reportMessage(ANARI_SEVERITY_DEBUG, "visrtx::Group building user BVH");
@@ -277,7 +307,8 @@ void Group::partitionValidGeometriesByType()
   m_surfaces = anari::make_Span(
       (Surface **)m_surfaceData->handlesBegin(), m_surfaceData->totalSize());
   m_surfacesTriangle.clear();
-  m_surfacesCurve.clear();
+  m_surfacesCurveLinear.clear();
+  m_surfacesCurveQuadraticBSpline.clear();
   m_surfacesUser.clear();
   for (auto s : m_surfaces) {
     if (!s->isValid()) {
@@ -287,12 +318,25 @@ void Group::partitionValidGeometriesByType()
       continue;
     }
     auto g = s->geometry();
-    if (g->optixGeometryType() == OPTIX_BUILD_INPUT_TYPE_TRIANGLES)
+    auto type = g->geometryType();
+    switch (type) {
+    case GeometryType::CONE:
+    case GeometryType::TRIANGLE:
+    case GeometryType::QUAD:
       m_surfacesTriangle.push_back(s);
-    else if (g->optixGeometryType() == OPTIX_BUILD_INPUT_TYPE_CURVES)
-      m_surfacesCurve.push_back(s);
-    else
+      break;
+    case GeometryType::CURVE:
+      m_surfacesCurveLinear.push_back(s);
+      break;
+    case GeometryType::CYLINDER:
+      m_surfacesCurveQuadraticBSpline.push_back(s);
+      break;
+    case GeometryType::SPHERE:
       m_surfacesUser.push_back(s);
+      break;
+    default:
+      break;
+    }
   }
 }
 
@@ -348,15 +392,25 @@ void Group::buildSurfaceGPUData()
   } else
     m_surfaceTriangleObjectIndices.reset();
 
-  if (!m_surfacesCurve.empty()) {
-    std::vector<DeviceObjectIndex> tmp(m_surfacesCurve.size());
-    std::transform(m_surfacesCurve.begin(),
-        m_surfacesCurve.end(),
+  if (!m_surfacesCurveLinear.empty()) {
+    std::vector<DeviceObjectIndex> tmp(m_surfacesCurveLinear.size());
+    std::transform(m_surfacesCurveLinear.begin(),
+        m_surfacesCurveLinear.end(),
         tmp.begin(),
         [](auto v) { return v->index(); });
-    m_surfaceCurveObjectIndices.upload(tmp);
+    m_surfaceCurveLinearObjectIndices.upload(tmp);
   } else
-    m_surfaceCurveObjectIndices.reset();
+    m_surfaceCurveLinearObjectIndices.reset();
+
+  if (!m_surfacesCurveQuadraticBSpline.empty()) {
+    std::vector<DeviceObjectIndex> tmp(m_surfacesCurveQuadraticBSpline.size());
+    std::transform(m_surfacesCurveQuadraticBSpline.begin(),
+        m_surfacesCurveQuadraticBSpline.end(),
+        tmp.begin(),
+        [](auto v) { return v->index(); });
+    m_surfaceCurveQuadraticBSplineObjectIndices.upload(tmp);
+  } else
+    m_surfaceCurveQuadraticBSplineObjectIndices.reset();
 
   if (!m_surfacesUser.empty()) {
     std::vector<DeviceObjectIndex> tmp(m_surfacesUser.size());

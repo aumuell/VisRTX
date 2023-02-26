@@ -165,9 +165,9 @@ void Cone::populateBuildInput(OptixBuildInput &buildInput) const
   buildInput.triangleArray.numSbtRecords = 1;
 }
 
-int Cone::optixGeometryType() const
+GeometryType Cone::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+  return GeometryType::CONE;
 }
 
 bool Cone::isValid() const

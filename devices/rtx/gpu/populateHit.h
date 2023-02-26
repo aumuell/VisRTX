@@ -111,16 +111,17 @@ RT_FUNCTION vec2 uv(GeometryType type)
     const ::float2 values = optixGetTriangleBarycentrics();
     return vec2(values.x, values.y);
   }
+  case GeometryType::CYLINDER:
   case GeometryType::CURVE: {
     const float u = optixGetCurveParameter();
     return vec2(u, 1.f - u);
   }
-  case GeometryType::SPHERE:
-  case GeometryType::CYLINDER:
-  default: {
+  case GeometryType::SPHERE: {
     const float u = bit_cast<float>(optixGetAttribute_0());
     return vec2(u, 1.f - u);
   }
+  default:
+    return vec2(0.f);
   }
 }
 
@@ -233,9 +234,26 @@ RT_FUNCTION void computeNormal(
     break;
   }
   case GeometryType::CYLINDER: {
-    hit.Ng = hit.Ns = vec3(bit_cast<float>(optixGetAttribute_1()),
-        bit_cast<float>(optixGetAttribute_2()),
-        bit_cast<float>(optixGetAttribute_3()));
+    const uint32_t idx = ggd.cylinder.indices[primID];
+    const vec3 v0 = ggd.cylinder.vertices[idx + 0];
+    const vec3 v1 = ggd.cylinder.vertices[idx + 1];
+    const vec3 v2 = ggd.cylinder.vertices[idx + 2];
+    const float r0 = ggd.cylinder.radii[idx + 0];
+    const float r1 = ggd.cylinder.radii[idx + 1];
+    const float r2 = ggd.cylinder.radii[idx + 2];
+
+    auto u = optixGetCurveParameter();
+    {
+      vec4 controlPoints[3] = {{v0.x, v0.y, v0.z, r0},
+          {v1.x, v1.y, v1.z, r1},
+          {v2.x, v2.y, v2.z, r2}};
+
+      QuadraticBSplineSegment interpolator(controlPoints);
+      auto hp =
+          optixTransformPointFromWorldToObjectSpace((::float3 &)hit.hitpoint);
+      hit.Ng = hit.Ns =
+          curveSurfaceNormal(interpolator, u, vec3(hp.x, hp.y, hp.z));
+    }
     break;
   }
   case GeometryType::CONE: {

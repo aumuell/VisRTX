@@ -46,30 +46,35 @@ struct Cylinder : public Geometry
 
   void populateBuildInput(OptixBuildInput &) const override;
 
-  int optixGeometryType() const override;
+  GeometryType geometryType() const override;
 
   bool isValid() const override;
 
  private:
+  void computeCylinders();
   GeometryGPUData gpuData() const override;
   void cleanup();
 
   helium::IntrusivePtr<Array1D> m_index;
   helium::IntrusivePtr<Array1D> m_radius;
 
-  helium::IntrusivePtr<Array1D> m_vertex;
+  helium::IntrusivePtr<Array1D> m_vertexPosition;
   helium::IntrusivePtr<Array1D> m_vertexColor;
   helium::IntrusivePtr<Array1D> m_vertexAttribute0;
   helium::IntrusivePtr<Array1D> m_vertexAttribute1;
   helium::IntrusivePtr<Array1D> m_vertexAttribute2;
   helium::IntrusivePtr<Array1D> m_vertexAttribute3;
 
-  HostDeviceArray<box3> m_aabbs;
-  CUdeviceptr m_aabbsBufferPtr{};
-
   float m_globalRadius{1.f};
-
   bool m_caps{false};
+
+  HostDeviceArray<vec3> m_generatedVertices;
+  HostDeviceArray<uint32_t> m_generatedIndices;
+  HostDeviceArray<uvec2> m_generatedAttributeIndices;
+  HostDeviceArray<float> m_generatedRadii;
+
+  CUdeviceptr m_vertexBufferPtr{};
+  CUdeviceptr m_radiusBufferPtr{};
 };
 
 } // namespace visrtx

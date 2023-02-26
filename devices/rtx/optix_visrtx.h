@@ -136,7 +136,8 @@ struct DeviceGlobalState : public helium::BaseGlobalDeviceState
 
   struct IntersectionModules
   {
-    OptixModule curveIntersector{nullptr};
+    OptixModule curveIntersectorLinear{nullptr};
+    OptixModule curveIntersectorQuadratic{nullptr};
     OptixModule customIntersectors{nullptr};
   } intersectionModules;
 

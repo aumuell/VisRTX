@@ -110,9 +110,9 @@ void Quad::populateBuildInput(OptixBuildInput &buildInput) const
   buildInput.triangleArray.numSbtRecords = 1;
 }
 
-int Quad::optixGeometryType() const
+GeometryType Quad::geometryType() const
 {
-  return OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+  return GeometryType::QUAD;
 }
 
 bool Quad::isValid() const

@@ -46,7 +46,7 @@ struct Curve : public Geometry
 
   void populateBuildInput(OptixBuildInput &) const override;
 
-  int optixGeometryType() const override;
+  GeometryType geometryType() const override;
 
   bool isValid() const override;
 

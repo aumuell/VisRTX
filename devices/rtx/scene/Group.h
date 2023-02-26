@@ -54,18 +54,22 @@ struct Group : public Object
   void commit() override;
 
   OptixTraversableHandle optixTraversableTriangle() const;
-  OptixTraversableHandle optixTraversableCurve() const;
+  OptixTraversableHandle optixTraversableCurveLinear() const;
+  OptixTraversableHandle optixTraversableCurveQuadraticBSpline() const;
   OptixTraversableHandle optixTraversableUser() const;
   OptixTraversableHandle optixTraversableVolume() const;
 
   bool containsTriangleGeometry() const;
-  bool containsCurveGeometry() const;
+  bool containsCurveLinearGeometry() const;
+  bool containsCurveQuadraticBSplineGeometry() const;
   bool containsUserGeometry() const;
   bool containsVolumes() const;
   bool containsLights() const;
 
   anari::Span<const DeviceObjectIndex> surfaceTriangleGPUIndices() const;
-  anari::Span<const DeviceObjectIndex> surfaceCurveGPUIndices() const;
+  anari::Span<const DeviceObjectIndex> surfaceCurveLinearGPUIndices() const;
+  anari::Span<const DeviceObjectIndex> surfaceCurveQuadraticBSplineGPUIndices()
+      const;
   anari::Span<const DeviceObjectIndex> surfaceUserGPUIndices() const;
   anari::Span<const DeviceObjectIndex> volumeGPUIndices() const;
   anari::Span<const DeviceObjectIndex> lightGPUIndices() const;
@@ -91,11 +95,13 @@ struct Group : public Object
   anari::Span<Surface *> m_surfaces;
 
   std::vector<Surface *> m_surfacesTriangle;
-  std::vector<Surface *> m_surfacesCurve;
+  std::vector<Surface *> m_surfacesCurveLinear;
+  std::vector<Surface *> m_surfacesCurveQuadraticBSpline;
   std::vector<Surface *> m_surfacesUser;
 
   DeviceBuffer m_surfaceTriangleObjectIndices;
-  DeviceBuffer m_surfaceCurveObjectIndices;
+  DeviceBuffer m_surfaceCurveLinearObjectIndices;
+  DeviceBuffer m_surfaceCurveQuadraticBSplineObjectIndices;
   DeviceBuffer m_surfaceUserObjectIndices;
 
   // Volume //
@@ -122,15 +128,18 @@ struct Group : public Object
   } m_objectUpdates;
 
   box3 m_triangleBounds;
-  box3 m_curveBounds;
+  box3 m_curveLinearBounds;
+  box3 m_curveQuadraticBSplineBounds;
   box3 m_userBounds;
   box3 m_volumeBounds;
 
   OptixTraversableHandle m_traversableTriangle{};
   DeviceBuffer m_bvhTriangle;
 
-  OptixTraversableHandle m_traversableCurve{};
-  DeviceBuffer m_bvhCurve;
+  OptixTraversableHandle m_traversableCurveLinear{};
+  DeviceBuffer m_bvhCurveLinear;
+  OptixTraversableHandle m_traversableCurveQuadraticBSpline{};
+  DeviceBuffer m_bvhCurveQuadraticBSpline;
 
   OptixTraversableHandle m_traversableUser{};
   DeviceBuffer m_bvhUser;

@@ -136,12 +136,13 @@ struct QuadGeometryData
 
 struct CylinderGeometryData
 {
-  const uvec2 *indices;
+  const uint32_t *indices;
+  const uvec2 *attrIndices;
   const vec3 *vertices;
   AttributePtr vertexAttr[5]; // attribute0-3 + color
   const float *radii;
-  float radius;
   bool caps;
+  bool indexed;
 };
 
 struct CurveGeometryData

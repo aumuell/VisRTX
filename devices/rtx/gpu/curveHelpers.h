@@ -86,21 +86,116 @@ struct LinearBSplineSegment
   vec4 p[2];
 };
 
-RT_FUNCTION vec3 curveSurfaceNormal(
-    const LinearBSplineSegment &bc, float u, const vec3 &ps)
+struct QuadraticBSplineSegment
 {
-  const vec4 p4 = bc.position4(u);
-  const vec3 p(p4);
-  const float r = p4.w;
-  const vec4 d4 = bc.velocity4(u);
-  const vec3 d = make_vec3(d4);
+  RT_FUNCTION QuadraticBSplineSegment(const vec4 *q)
+  {
+    initializeFromBSpline(q);
+  }
 
-  float dd = dot(d, d);
+  RT_FUNCTION void initializeFromBSpline(const vec4 *q)
+  {
+    p[0] = q[1] / 2.0f + q[0] / 2.0f;
+    p[1] = q[1] - q[0];
+    p[2] = q[0] / 2.0f - q[1] + q[2] / 2.0f;
+  }
 
-  vec3 o1 = ps - p;
-  o1 -= (dot(o1, d) / dd) * d;
-  o1 *= r / length(o1);
-  return normalize(o1);
+  RT_FUNCTION void export2BSpline(vec4 bs[3]) const
+  {
+    bs[0] = p[0] - p[1] / 2.f;
+    bs[1] = p[0] + p[1] / 2.f;
+    bs[2] = p[0] + 1.5f * p[1] + 2.f * p[2];
+  }
+
+  RT_FUNCTION vec3 position3(float u) const
+  {
+    return (vec3 &)p[0] + u * (vec3 &)p[1] + u * u * (vec3 &)p[2];
+  }
+  RT_FUNCTION vec4 position4(float u) const
+  {
+    return p[0] + u * p[1] + u * u * p[2];
+  }
+
+  RT_FUNCTION float radius(float u) const
+  {
+    return p[0].w + u * (p[1].w + u * p[2].w);
+  }
+
+  RT_FUNCTION float min_radius(float u1, float u2) const
+  {
+    float root1 = glm::clamp(-0.5f * p[1].w / p[2].w, u1, u2);
+    return fminf(fminf(radius(u1), radius(u2)), radius(root1));
+  }
+
+  RT_FUNCTION float max_radius(float u1, float u2) const
+  {
+    if (!p[1].w && !p[2].w)
+      return p[0].w; // a quick bypass for constant width
+    float root1 = glm::clamp(-0.5f * p[1].w / p[2].w, u1, u2);
+    return fmaxf(fmaxf(radius(u1), radius(u2)), radius(root1));
+  }
+
+  RT_FUNCTION vec3 velocity3(float u) const
+  {
+    return (vec3 &)p[1] + 2.f * u * (vec3 &)p[2];
+  }
+  RT_FUNCTION vec4 velocity4(float u) const
+  {
+    return p[1] + 2.f * u * p[2];
+  }
+
+  RT_FUNCTION vec3 acceleration3(float u) const
+  {
+    return 2.f * (vec3 &)p[2];
+  }
+  RT_FUNCTION vec4 acceleration4(float u) const
+  {
+    return 2.f * p[2];
+  }
+
+  RT_FUNCTION float derivative_of_radius(float u) const
+  {
+    return p[1].w + 2.f * u * p[2].w;
+  }
+
+  vec4 p[3];
+};
+
+template <typename CurveSegmentType>
+RT_FUNCTION vec3 curveSurfaceNormal(
+    const CurveSegmentType &bc, float u, const vec3 &ps)
+{
+  constexpr bool linear =
+      std::is_same_v<CurveSegmentType, LinearBSplineSegment>;
+
+  vec3 normal;
+  if (u == 0.0f) {
+    if constexpr (linear)
+      normal = ps - (vec3 &)(bc.p[0]); // round endcaps
+    else
+      normal = -bc.velocity3(0); // flat endcaps
+  } else if (u == 1.0f) {
+    if constexpr (linear) {
+      const vec3 p1 = (vec3 &)(bc.p[1]) + (vec3 &)(bc.p[0]);
+      normal = ps - p1; // round endcaps
+    } else
+      normal = bc.velocity3(1); // flat endcaps
+  } else {
+    const vec4 p4 = bc.position4(u);
+    const vec3 p(p4);
+    const float r = p4.w;
+    const vec4 d4 = bc.velocity4(u);
+    const vec3 d = make_vec3(d4);
+
+    float dd = dot(d, d);
+
+    vec3 o1 = ps - p;
+    o1 -= (dot(o1, d) / dd) * d;
+    o1 *= r / length(o1);
+    normal = normalize(o1);
+  }
+
+  return normal;
 }
 
 } // namespace visrtx

@@ -46,7 +46,7 @@ struct Geometry : public RegisteredObject<GeometryGPUData>
   void commit() override;
 
   virtual void populateBuildInput(OptixBuildInput &) const = 0;
-  virtual int optixGeometryType() const = 0;
+  virtual GeometryType geometryType() const = 0;
 
   void markCommitted() override;
 

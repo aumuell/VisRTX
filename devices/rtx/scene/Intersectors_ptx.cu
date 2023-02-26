@@ -87,74 +87,6 @@ RT_FUNCTION void intersectSphere(const GeometryGPUData &geometryData)
   reportIntersection(projCO - td);
 }
 
-RT_FUNCTION void intersectCylinder(const GeometryGPUData &geometryData)
-{
-  const auto &cylinderData = geometryData.cylinder;
-
-  const uvec2 pidx = cylinderData.indices
-      ? cylinderData.indices[ray::primID()]
-      : uvec2(2 * ray::primID(), 2 * ray::primID() + 1);
-
-  const auto p0 = cylinderData.vertices[pidx.x];
-  const auto p1 = cylinderData.vertices[pidx.y];
-
-  const float radius = cylinderData.radii ? cylinderData.radii[ray::primID()]
-                                          : cylinderData.radius;
-
-  const vec3 ro = ray::localOrigin();
-  const vec3 rd = ray::localDirection();
-
-  const vec3 cZ = p1 - p0;
-  const vec3 q = ro - p0;
-
-  const float z2 = glm::dot(cZ, cZ);
-  const float d = glm::dot(cZ, rd);
-  const float c = glm::dot(cZ, q);
-
-  const float A = z2 - (d * d);
-  const float B = z2 * glm::dot(q, rd) - c * d;
-  const float C = z2 * glm::dot(q, q) - (c * c) - (radius * radius) * z2;
-
-  float radical = B * B - A * C;
-  if (radical < 0.f)
-    return;
-
-  radical = glm::sqrt(radical);
-
-  // First hit //
-
-  const float tin = (-B - radical) / A;
-  const float yin = c + tin * d;
-  if (yin > 0.f && yin < z2) {
-    const vec3 normal = (q + tin * rd - cZ * yin * (1.f / z2)) * (1.f / radius);
-    reportIntersection(tin, normal, yin * (1.f / z2));
-  } else if (cylinderData.caps) {
-    const float tcapin = (((yin < 0.f) ? 0.f : z2) - c) / d;
-    if (abs(B + A * tcapin) < radical) {
-      const float us = yin < 0.f ? -1.f : 1.f;
-      const vec3 normal = cZ * us / z2;
-      reportIntersection(tin, normal, (yin < 0.f) ? 0.f : 1.f);
-    }
-  }
-
-  // Second hit //
-
-  const float tout = (-B + radical) / A;
-  const float yout = c + tout * d;
-  if (yout > 0.f && yout < z2) {
-    const vec3 normal =
-        (q + tout * rd - cZ * yout * (1.f / z2)) * (1.f / radius);
-    reportIntersection(tout, normal, yout * (1.f / z2));
-  } else if (cylinderData.caps) {
-    const float tcapout = (((yout < 0.f) ? 0.f : z2) - c) / d;
-    if (abs(B + A * tcapout) < radical) {
-      const float us = yout < 0.f ? -1.f : 1.f;
-      const vec3 normal = cZ * us / z2;
-      reportIntersection(tout, normal, (yout < 0.f) ? 0.f : 1.f);
-    }
-  }
-}
-
 RT_FUNCTION void intersectVolume()
 {
   auto &hit = ray::rayData<VolumeHit>();
@@ -194,9 +126,6 @@ RT_FUNCTION void intersectGeometry()
   switch (geometryData.type) {
   case GeometryType::SPHERE:
     intersectSphere(geometryData);
-    break;
-  case GeometryType::CYLINDER:
-    intersectCylinder(geometryData);
     break;
   }
 }

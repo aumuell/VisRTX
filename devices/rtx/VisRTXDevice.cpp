@@ -623,7 +623,15 @@ void VisRTXDevice::initDevice()
       &moduleCompileOptions,
       &pipelineCompileOptions,
       &builtinISOptions,
-      &state.intersectionModules.curveIntersector));
+      &state.intersectionModules.curveIntersectorLinear));
+
+  builtinISOptions.builtinISModuleType =
+      OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE;
+  OPTIX_CHECK(optixBuiltinISModuleGet(state.optixContext,
+      &moduleCompileOptions,
+      &pipelineCompileOptions,
+      &builtinISOptions,
+      &state.intersectionModules.curveIntersectorQuadratic));
 
   m_initialized = true;
 }

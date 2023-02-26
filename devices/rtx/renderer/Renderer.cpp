@@ -320,7 +320,8 @@ void Renderer::initOptixPipeline()
           pgDesc.hitgroup.entryFunctionNameAH = hgn.anyHit.c_str();
         }
 
-        pgDesc.hitgroup.moduleIS = state.intersectionModules.curveIntersector;
+        pgDesc.hitgroup.moduleIS =
+            state.intersectionModules.curveIntersectorLinear;
         pgDesc.hitgroup.entryFunctionNameIS = nullptr;
 
         sizeof_log = sizeof(log);
@@ -333,7 +334,39 @@ void Renderer::initOptixPipeline()
             &m_hitgroupPGs[i++]));
         if (sizeof_log > 1) {
           reportMessage(
-              ANARI_SEVERITY_DEBUG, "PG Hitgroup Log (Curve):\n%s", log);
+              ANARI_SEVERITY_DEBUG, "PG Hitgroup Log (Linear Curve):\n%s", log);
+        }
+      }
+
+      {
+        OptixProgramGroupOptions pgOptions = {};
+        OptixProgramGroupDesc pgDesc = {};
+        pgDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+
+        pgDesc.hitgroup.moduleCH = shadingModule;
+        pgDesc.hitgroup.entryFunctionNameCH = hgn.closestHit.c_str();
+
+        if (!hgn.anyHit.empty()) {
+          pgDesc.hitgroup.moduleAH = shadingModule;
+          pgDesc.hitgroup.entryFunctionNameAH = hgn.anyHit.c_str();
+        }
+
+        pgDesc.hitgroup.moduleIS =
+            state.intersectionModules.curveIntersectorQuadratic;
+        pgDesc.hitgroup.entryFunctionNameIS = nullptr;
+
+        sizeof_log = sizeof(log);
+        OPTIX_CHECK(optixProgramGroupCreate(state.optixContext,
+            &pgDesc,
+            1,
+            &pgOptions,
+            log,
+            &sizeof_log,
+            &m_hitgroupPGs[i++]));
+        if (sizeof_log > 1) {
+          reportMessage(ANARI_SEVERITY_DEBUG,
+              "PG Hitgroup Log (Quadratic BSpline Curve):\n%s",
+              log);
         }
       }
 
@@ -442,7 +475,8 @@ OptixPipelineCompileOptions makeVisRTXOptixPipelineCompileOptions()
   OptixPipelineCompileOptions pipelineCompileOptions = {};
   pipelineCompileOptions.usesPrimitiveTypeFlags =
       OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE | OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM
-      | OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR;
+      | OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR
+      | OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE;
   pipelineCompileOptions.traversableGraphFlags =
       OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
   pipelineCompileOptions.usesMotionBlur = false;
