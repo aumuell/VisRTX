@@ -35,14 +35,9 @@ namespace visrtx {
 
 // Helper functions ///////////////////////////////////////////////////////////
 
-RT_FUNCTION void reportIntersection(float t, const vec3 &normal, float u)
+RT_FUNCTION void reportIntersection(float t, float u)
 {
-  optixReportIntersection(t,
-      0,
-      bit_cast<uint32_t>(u),
-      bit_cast<uint32_t>(normal.x),
-      bit_cast<uint32_t>(normal.y),
-      bit_cast<uint32_t>(normal.z));
+  optixReportIntersection(t, 0, bit_cast<uint32_t>(u));
 }
 
 RT_FUNCTION void reportIntersection(float t)
@@ -126,15 +121,11 @@ RT_FUNCTION void intersectCylinder(const GeometryGPUData &geometryData)
   const float tin = (-B - radical) / A;
   const float yin = c + tin * d;
   if (yin > 0.f && yin < z2) {
-    const vec3 normal = (q + tin * rd - cZ * yin * (1.f / z2)) * (1.f / radius);
-    reportIntersection(tin, normal, yin * (1.f / z2));
+    reportIntersection(tin, 1.f - yin * (1.f / z2));
   } else if (cylinderData.caps) {
     const float tcapin = (((yin < 0.f) ? 0.f : z2) - c) / d;
-    if (abs(B + A * tcapin) < radical) {
-      const float us = yin < 0.f ? -1.f : 1.f;
-      const vec3 normal = cZ * us / z2;
-      reportIntersection(tin, normal, (yin < 0.f) ? 0.f : 1.f);
-    }
+    if (abs(B + A * tcapin) < radical)
+      reportIntersection(tin, 1.f - (yin < 0.f) ? 0.f : 1.f);
   }
 
   // Second hit //
@@ -142,16 +133,11 @@ RT_FUNCTION void intersectCylinder(const GeometryGPUData &geometryData)
   const float tout = (-B + radical) / A;
   const float yout = c + tout * d;
   if (yout > 0.f && yout < z2) {
-    const vec3 normal =
-        (q + tout * rd - cZ * yout * (1.f / z2)) * (1.f / radius);
-    reportIntersection(tout, normal, yout * (1.f / z2));
+    reportIntersection(tout, 1.f - yout * (1.f / z2));
   } else if (cylinderData.caps) {
     const float tcapout = (((yout < 0.f) ? 0.f : z2) - c) / d;
-    if (abs(B + A * tcapout) < radical) {
-      const float us = yout < 0.f ? -1.f : 1.f;
-      const vec3 normal = cZ * us / z2;
-      reportIntersection(tout, normal, (yout < 0.f) ? 0.f : 1.f);
-    }
+    if (abs(B + A * tcapout) < radical)
+      reportIntersection(tout, 1.f - (yout < 0.f) ? 0.f : 1.f);
   }
 }
 

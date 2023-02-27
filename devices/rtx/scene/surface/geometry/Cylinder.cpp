@@ -102,7 +102,7 @@ void Cylinder::commit()
         const float r = radius ? radius[cylinderID++] : m_globalRadius;
         const vec3 &v1 = *(posBegin + v.x);
         const vec3 &v2 = *(posBegin + v.y);
-        box3 bounds = box3(v1 - r, v1 + r);
+        box3 bounds(v1 - r, v1 + r);
         bounds.extend(box3(v2 - r, v2 + r));
         return bounds;
       });

@@ -233,9 +233,26 @@ RT_FUNCTION void computeNormal(
     break;
   }
   case GeometryType::CYLINDER: {
-    hit.Ng = hit.Ns = vec3(bit_cast<float>(optixGetAttribute_1()),
-        bit_cast<float>(optixGetAttribute_2()),
-        bit_cast<float>(optixGetAttribute_3()));
+    const uvec2 idx = ggd.cylinder.indices ? ggd.cylinder.indices[primID]
+                                           : 2 * primID + uvec2(0, 1);
+    const vec3 v0 = ggd.cylinder.vertices[idx.x];
+    const vec3 v1 = ggd.cylinder.vertices[idx.y];
+
+    if (b.y == 0.f)
+      hit.Ng = hit.Ns = normalize(v1 - v0);
+    else if (b.y == 1.f)
+      hit.Ng = hit.Ns = normalize(v0 - v1);
+    else {
+      const float r =
+          ggd.cylinder.radii ? ggd.cylinder.radii[primID] : ggd.cylinder.radius;
+      vec4 controlPoints[2] = {{v0.x, v0.y, v0.z, r}, {v1.x, v1.y, v1.z, r}};
+
+      LinearBSplineSegment interpolator(controlPoints);
+      auto hp =
+          optixTransformPointFromWorldToObjectSpace((::float3 &)hit.hitpoint);
+      hit.Ng = hit.Ns =
+          curveSurfaceNormal(interpolator, b.y, vec3(hp.x, hp.y, hp.z));
+    }
     break;
   }
   case GeometryType::CONE: {
@@ -294,7 +311,7 @@ RT_FUNCTION void populateSurfaceHit(SurfaceHit &hit)
   hit.hitpoint = ray::hitpoint();
   hit.uvw = ray::uvw(gd.type);
   hit.primID = ray::primID();
-  hit.epsilon = epsilonFrom(ray::hitpoint(), ray::direction(), ray::t());
+  hit.epsilon = 2.f * epsilonFrom(ray::hitpoint(), ray::direction(), ray::t());
   ray::computeNormal(gd, ray::primID(), hit);
 }
 
